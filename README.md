@@ -1,4 +1,4 @@
-# 🛡️ Abhaya | Safe Route AI (Bhubaneswar Edition)
+# 🛡️ Abhaya | Safe Route AI (Bhubaneswar)
 
 A comprehensive, production-ready routing system designed for **safety-aware navigation**. While standard GPS apps optimize only for the shortest travel time, Abhaya introduces a context-aware AI routing engine that calculates the **safest possible path** by evaluating historical risk data, time of day, and environmental conditions.
 
@@ -54,5 +54,5 @@ Unlike basic API-wrapper apps, Abhaya computes its safe routes **locally via gra
 ### 1. Backend Setup
 Clone the repository and navigate to the backend directory:
 ```bash
-git clone [https://github.com/Maahivarma/abhaya-safe-route-ai.git](https://github.com/Maahivarma/abhaya-safe-route-ai.git)
+git clone [https://github.com/jyotiradityaparida25/abhaya-safe-route-ai](https://github.com/jyotiradityaparida25/abhaya-safe-route-ai)
 cd abhaya-safe-route-ai
