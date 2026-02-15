@@ -1,0 +1,10 @@
+# Ignore Python Virtual Environment
+backend/venv/
+venv/
+__pycache__/
+
+# Ignore massive map graph files
+*.graphml
+
+# Ignore OS junk
+.DS_Store

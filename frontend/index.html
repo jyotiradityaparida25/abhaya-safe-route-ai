@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abhaya | Safe Route Suggestion</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        /* Base Blue & White Theme */
+        body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; background: #f0f4f8; }
+        
+        #map { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+
+        /* AI Processing Overlay */
+        #map-overlay {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 500; display: none; flex-direction: column; justify-content: center; align-items: center; 
+            color: #0d6efd; transition: all 0.3s ease;
+        }
+
+        /* Crisp White Glassmorphism Sidebar */
+        #sidebar { 
+            position: absolute; top: 20px; left: 20px; width: 380px; height: calc(100vh - 40px);
+            z-index: 1000; display: flex; flex-direction: column;
+            background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(13, 110, 253, 0.15); border-radius: 24px; 
+            box-shadow: 0 10px 40px rgba(13, 110, 253, 0.1);
+            overflow: hidden; color: #0f172a;
+        }
+
+        .sidebar-content { padding: 25px; flex-grow: 1; overflow-y: auto; }
+        .sidebar-content::-webkit-scrollbar { width: 5px; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: rgba(13, 110, 253, 0.2); border-radius: 10px; }
+        
+        /* Vibrant Blue Header */
+        .sidebar-header { 
+            background: linear-gradient(135deg, #0d6efd, #0a58ca); 
+            color: white; padding: 20px; text-align: center; 
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
+        }
+        
+        /* Clean Dashboard Cards */
+        .metric-card { 
+            background: #ffffff; border: 1px solid #e2e8f0;
+            border-left: 5px solid #0d6efd; padding: 15px; margin-bottom: 15px; border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s ease;
+        }
+        .metric-title { font-size: 0.80rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value { font-size: 1.8rem; font-weight: 800; color: #0f172a; }
+        
+        /* Soft Blue Inputs */
+        .form-control, .form-select {
+            background: #f8fafc; border: 1px solid #cbd5e1;
+            color: #0f172a; border-radius: 10px; font-weight: 500; transition: all 0.3s ease;
+        }
+        .form-control:focus, .form-select:focus { 
+            background: #ffffff; color: #0f172a; 
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); border-color: #0d6efd;
+        }
+        
+        /* Toggle Container */
+        .nav-pills { background: #f1f5f9; border-radius: 12px; padding: 5px; border: 1px solid #e2e8f0; }
+        .nav-pills .nav-link { border-radius: 8px; font-weight: 600; color: #64748b; }
+        .btn { border-radius: 10px; font-weight: 600; letter-spacing: 0.5px; }
+
+        /* Custom Map Markers */
+        .custom-marker-start { background: #0d6efd; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(13,110,253,0.5); }
+        .custom-marker-end { background: #dc3545; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 10px rgba(220,53,69,0.5); }
+
+        /* FAB SOS BUTTON */
+        .fab-sos {
+            position: fixed; bottom: 30px; right: 30px; width: 80px; height: 80px; border-radius: 50%;
+            background: #dc3545; color: white; border: 4px solid #fff; display: flex; justify-content: center; align-items: center;
+            font-size: 2rem; cursor: pointer; z-index: 2000; box-shadow: 0 10px 25px rgba(220, 53, 69, 0.4);
+            animation: pulse-red 2s infinite; transition: transform 0.2s;
+        }
+        .fab-sos:hover { transform: scale(1.05); }
+
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 25px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="map"></div>
+    
+    <div id="map-overlay">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h4 class="fw-bold text-dark">AI Routing in Progress...</h4>
+        <p class="text-muted">Calculating optimal safe vectors</p>
+    </div>
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h3 class="m-0 fw-bold">🛡️ Abhaya</h3>
+            <small style="letter-spacing: 2px; opacity: 0.9;">SAFE ROUTE AI</small>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="mb-3">
+                <label class="form-label fw-bold text-primary small text-uppercase" style="opacity: 0.8;">Origin</label>
+                <input type="text" id="start-location" class="form-control" value="ITER, Bhubaneswar">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold text-primary small text-uppercase" style="opacity: 0.8;">Destination</label>
+                <input type="text" id="end-location" class="form-control" value="KIIT, Bhubaneswar">
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-6">
+                    <label class="form-label fw-bold text-primary small text-uppercase" style="opacity: 0.8;">Time</label>
+                    <select id="time-context" class="form-select">
+                        <option value="day" selected>Day ☀️</option>
+                        <option value="night">Night 🌙</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-bold text-primary small text-uppercase" style="opacity: 0.8;">Weather</label>
+                    <select id="weather-context" class="form-select">
+                        <option value="clear">Clear 🌤️</option>
+                        <option value="rain">Rain 🌧️</option>
+                        <option value="fog">Fog 🌫️</option>
+                    </select>
+                </div>
+            </div>
+
+            <ul class="nav nav-pills nav-fill mb-4" id="routeMode" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active bg-primary text-white fw-bold shadow-sm" id="fastest-tab" data-bs-toggle="pill" type="button" onclick="setMode('fastest')">⚡ Fastest</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link text-secondary opacity-75" id="safest-tab" data-bs-toggle="pill" type="button" onclick="setMode('safest')">🛡️ Safest</button>
+                </li>
+            </ul>
+
+            <button id="calc-btn" class="btn btn-primary w-100 btn-lg mb-4 shadow-sm" onclick="calculateRoute()">
+                <span id="btn-text">Calculate Route</span>
+            </button>
+
+            <h6 class="fw-bold mb-3 text-uppercase text-primary" style="letter-spacing: 1px; font-size: 0.8rem; opacity: 0.8;">Live Telemetry</h6>
+            
+            <div class="metric-card" id="card-distance" style="border-left-color: #0d6efd;">
+                <div class="metric-title">Distance & ETA</div>
+                <div class="metric-value" id="val-distance">-- km</div>
+                <div class="text-muted small fw-bold" id="val-eta">-- mins</div>
+            </div>
+            
+            <div class="metric-card" id="card-safety" style="border-left-color: #198754;">
+                <div class="metric-title">Safety Score</div>
+                <div class="metric-value" id="val-safety">--%</div>
+                <div class="text-muted small fw-bold" id="val-risk">Ready</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fab-sos" onclick="triggerSOS()" title="Emergency SOS">🚨</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const bBSR_LAT = 20.2961;
+    const bBSR_LNG = 85.8245;
+    
+    const map = L.map('map', { zoomControl: false }).setView([bBSR_LAT, bBSR_LNG], 13);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    // Clean, crisp white/silver map tiles to match the Blue/White theme
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        maxZoom: 19 
+    }).addTo(map);
+
+    let currentRouteLine = null;
+    let markers = [];
+    let currentMode = 'fastest';
+
+    const startIcon = L.divIcon({ className: 'custom-marker-start', iconSize: [16, 16], iconAnchor: [8, 8] });
+    const endIcon = L.divIcon({ className: 'custom-marker-end', iconSize: [16, 16], iconAnchor: [8, 8] });
+
+    // The perfect toggle logic is preserved here
+    function setMode(mode) {
+        currentMode = mode;
+        const fastBtn = document.getElementById('fastest-tab');
+        const safeBtn = document.getElementById('safest-tab');
+
+        if(mode === 'fastest') {
+            fastBtn.className = 'nav-link active bg-primary text-white fw-bold shadow-sm';
+            safeBtn.className = 'nav-link text-secondary opacity-75';
+            document.getElementById('card-distance').style.borderLeftColor = '#0d6efd';
+        } else {
+            safeBtn.className = 'nav-link active bg-success text-white fw-bold shadow-sm';
+            fastBtn.className = 'nav-link text-secondary opacity-75';
+            document.getElementById('card-distance').style.borderLeftColor = '#198754';
+        }
+    }
+
+    async function getCoordinates(query) {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+        throw new Error("Location not found");
+    }
+
+    async function calculateRoute() {
+        const startInput = document.getElementById('start-location').value;
+        const endInput = document.getElementById('end-location').value;
+        const timeInput = document.getElementById('time-context').value;
+        const weatherInput = document.getElementById('weather-context').value;
+        
+        const btn = document.getElementById('calc-btn');
+        btn.disabled = true;
+        document.getElementById('btn-text').innerText = "Processing...";
+        document.getElementById('map-overlay').style.display = "flex";
+
+        try {
+            const startCoords = await getCoordinates(startInput);
+            const endCoords = await getCoordinates(endInput);
+
+            if (currentRouteLine) map.removeLayer(currentRouteLine);
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            markers.push(L.marker([startCoords.lat, startCoords.lon], {icon: startIcon}).bindPopup("<b>Origin</b>").addTo(map));
+            markers.push(L.marker([endCoords.lat, endCoords.lon], {icon: endIcon}).bindPopup("<b>Destination</b>").addTo(map));
+
+            const backendUrl = "http://localhost:8000/api/get-algorithm-route";
+            const payload = {
+                start_lat: startCoords.lat, start_lng: startCoords.lon,
+                end_lat: endCoords.lat, end_lng: endCoords.lon,
+                time_of_day: timeInput, weather: weatherInput, mode: currentMode
+            };
+
+            const response = await fetch(backendUrl, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) throw new Error("Algorithm Failed");
+            const data = await response.json();
+
+            currentRouteLine = L.polyline(data.coordinates, {
+                color: data.color, weight: 7, opacity: 0.9
+            }).addTo(map);
+
+            map.fitBounds(currentRouteLine.getBounds(), { padding: [60, 60] });
+
+            document.getElementById('val-distance').innerText = data.distance_km + " km";
+            document.getElementById('val-eta').innerText = Math.round((data.distance_km / 30) * 60) + " mins";
+            document.getElementById('val-safety').innerText = data.safety_score + "%";
+            
+            let riskText = data.safety_score >= 70 ? "Safe Route" : data.safety_score >= 40 ? "Moderate Risk" : "High Risk";
+            document.getElementById('val-risk').innerText = riskText;
+            document.getElementById('val-risk').style.color = data.color;
+            document.getElementById('card-safety').style.borderLeftColor = data.color;
+
+        } catch (error) {
+            console.error(error); alert("Routing Error: " + error.message);
+        } finally {
+            btn.disabled = false;
+            document.getElementById('btn-text').innerText = "Calculate Route";
+            document.getElementById('map-overlay').style.display = "none";
+        }
+    }
+
+    function triggerSOS() {
+        if ("geolocation" in navigator) {
+            document.getElementById('val-risk').innerText = "ACQUIRING GPS...";
+            document.getElementById('val-risk').style.color = "#dc3545";
+
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const liveLat = position.coords.latitude; const liveLng = position.coords.longitude;
+                
+                L.circleMarker([liveLat, liveLng], {
+                    color: '#dc3545', fillColor: '#dc3545', fillOpacity: 0.9, weight: 4, radius: 12
+                }).addTo(map).bindPopup("<b>🚨 LIVE LOCATION DISPATCHED</b>").openPopup();
+                
+                map.setView([liveLat, liveLng], 16);
+                alert(`🚨 SOS SIGNAL SENT TO AUTHORITIES 🚨\n\nCoordinates: ${liveLat.toFixed(4)}, ${liveLng.toFixed(4)}`);
+                document.getElementById('val-risk').innerText = "SOS ACTIVE";
+
+            }, function(error) {
+                alert("🚨 GPS Error! Check permissions.");
+            }, { enableHighAccuracy: true });
+        }
+    }
+</script>
+
+</body>
+</html>
